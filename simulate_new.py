@@ -37,7 +37,7 @@ def get_random_tree(G, nodes, WTP=None):
         if len(new_G.nodes()) < nodes:
             random.shuffle(Q)
             u = Q.popleft()
-            for v in G.neighbors(u):
+            for v in G.predecessors(u):
                 if not V[v]:
                     Q.append(v)
                     new_G.add_edge(v,u)
@@ -64,7 +64,7 @@ def get_degree(G, node):
     return len(list(T.predecessors(node))) + len(list(G.successors(node)))
 
 
-def add_extra_edges(T, G, locations, extra, edge_limit=1000000, replace=False):
+def add_extra_edges2(T, G, locations, extra, edge_limit=1000000, replace=False):
     """
     Add extra edges to a given tree 'T' based on specified criteria.
 
@@ -314,7 +314,7 @@ def get_size_weight(G, W, V_, u):
 
     Note:
         This function performs a breadth-first search (BFS) starting from the node 'u' while marking visited nodes, calculating the size and weight of the ideal.
-    """    
+    """
     if V_[u]:
         return 0, 0
     
@@ -459,11 +459,13 @@ def simulate_robust_randtree(G, root, W, k2, S, plim, calcRobust, visitRobust, v
 
     Note:
         This function simulates a robust search for infected nodes in a directed graph, considering various constraints and parameters.
-    """   
+    """ 
     iters = []
     
     N = len(G.nodes())
     N_ = len(W)
+
+    paths = []
 
     node_it = 0
     for r in S:
@@ -475,6 +477,7 @@ def simulate_robust_randtree(G, root, W, k2, S, plim, calcRobust, visitRobust, v
 
         CV = [0 for u in range(N_)]
 
+        pth = [r]
         CV[r] = 1
         Q = deque([]); Q.append(r)
         while Q:
@@ -484,6 +487,8 @@ def simulate_robust_randtree(G, root, W, k2, S, plim, calcRobust, visitRobust, v
                 v = random.sample(successors, 1)[0]
                 CV[v] = 1
                 Q.append(v)
+                pth.append(v)
+        paths.append(pth)
 
         V = [1 for u in range(N_)]
         for u in G.nodes():
@@ -604,7 +609,7 @@ def simulate_robust_randtree(G, root, W, k2, S, plim, calcRobust, visitRobust, v
 
     print(sum(iters) / len(iters), max(iters), "\n\n\n")
     
-    return iters, map_prev
+    return iters, map_prev, paths
 
 
 if __name__ == "__main__":
@@ -612,20 +617,23 @@ if __name__ == "__main__":
     # Read parameters and files
     ratio = float(sys.argv[1])
     part = int(sys.argv[2])
-    output_file = f"results3/res_random_{ratio}_part{part}.txt"
+    K = int(sys.argv[3])
+    output_file = f"results4/res_random_{ratio}_part{part}_{K}.txt"
 
-    path_nodes = 'TG.txt'
-    nodes_location = pd.read_csv(path_nodes, sep=" ", header=None, names = ['ID', 'Longitude', 'Latitude'])
-    path_edges = 'TG_edge.txt'
-    edges_location = pd.read_csv(path_edges, sep=" ", header=None, names = ['edge_ID', 'ID_1', 'ID_2', 'Distance'])
+    path = 'graph_geom_corrected_cycles.csv'
+    csv_grafo = pd.read_csv(path, sep=';')
+
+    # Nodes to ignore to avoid cycles in graph
+    out = {15190, 1003206, 16503, 15004, 14062, 13735, 1003167, 1003744, 1003746, 1003950, 13730, 13731, 13732, 13733, 15131, 16094, 16095, 131099}
 
     # Create a set of nodes 'S' based on edge information
     S = set()
-    for index, row in edges_location.iterrows():
-        origin = row['ID_1']
-        dest = row['ID_2']
-        S.add(origin)
-        S.add(dest)
+    for index, row in csv_grafo.iterrows():
+        origin = row['self']
+        dest = row['other']
+        if origin not in out and dest not in out:
+            S.add(origin)
+            S.add(dest)
     S = list(S)
 
     # Create dictionaries for node ID mapping
@@ -634,24 +642,30 @@ if __name__ == "__main__":
         id_[u] = l; _id[l] = u
         l += 1
 
-    # Create a graph 'G_SJ' and obtain its number of nodes  'N_'        
-    G_SJ = nx.Graph()
-    for index, row in edges_location.iterrows():
-        origin = row['ID_1']
-        dest = row['ID_2']
-        G_SJ.add_edge(id_[origin], id_[dest])
+    # Create a graph 'G'
+    G = nx.DiGraph()
+    for index, row in csv_grafo.iterrows():
+        origin = row['self']
+        dest = row['other']
+        if origin not in out and dest not in out:
+            G.add_edge(id_[origin], id_[dest])
         
     N_ = l
+    WTP = 744
 
-    for _ in range(5):
+    NN = 4576
+
+    paths = [set() for _ in G.nodes()]
+
+    for _ in range(100):
 
         print(f"\n\n\n{_ + 1} RUN \n\n\n")
 
         # Generate a random tree 'T' and get the root 'WTP'
-        T, WTP = get_random_tree(G_SJ, 4000, 7139)
+        T, WTP = get_random_tree(G, N_, WTP)
 
         # Add extra edges to the tree 'T' to create 'g'
-        g = add_extra_edges(T, G_SJ, nodes_location, math.ceil(len(list(T.edges())) * ratio))
+        g = add_extra_edges2(T, G, None, math.ceil(len(list(T.edges())) * ratio))
         
         # Convert 'g' to an undirected graph 'u' and calculate treewidth parameters 'k1' and 'k2'
         u = g.to_undirected()
@@ -661,18 +675,27 @@ if __name__ == "__main__":
         
         nE = len(list(g.edges()))
         print(nE)
-        K = 5
-        W = [1000000 for i in range(len(G_SJ.nodes()))]
+        W = [1000000 for i in range(len(G.nodes()))]
 
-        # Run the simulation 'simulate_robust_randtree' and store iteration counts in 'iters'
-        iters, _ = simulate_robust_randtree(g, WTP, W, K, g.nodes(), 0, True, True, False, {})
+        # Run the simulation 'simulate_robust_randtree' and store iteration counts in 'iters'.
+        # We also store de infection paths used for each node
+        iters, _, pp = simulate_robust_randtree(g, WTP, W, K, g.nodes(), 0, True, True, False, {})
+        
+        # Accumulate store of paths used
+        for i in range(len(g.nodes())):
+            paths[i].add('|'.join([str(x) for x in pp[i]]))
 
-        # Write results to the output file   
+        # Write results to the output file
         with open(output_file, "a") as myfile:
             myfile.write(f'{nE}\n')
             myfile.write(f'{kk}\n')
-            myfile.write(' '.join([str(i) for i in iters[:4000]]) + '\n')
+            myfile.write(' '.join([str(i) for i in iters[:len(g.nodes())]]) + '\n')
 
     # Write a marker indicating the run ended normally
     with open(output_file, "a") as myfile:
         myfile.write("RUN ENDED NORMALLY\n")
+    
+    # Write number of paths used by node
+    with open(output_file, "a") as myfile:
+        for i in range(NN):
+            myfile.write(f"{len(paths[i])}\n")
