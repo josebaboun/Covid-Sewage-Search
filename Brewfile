@@ -1,0 +1,15 @@
+tap "homebrew/bundle"
+tap "homebrew/cask"
+tap "homebrew/core"
+tap "microsoft/mssql-release"
+brew "ca-certificates"
+brew "xz"
+brew "geos"
+brew "mpdecimal"
+brew "openblas"
+brew "openssl@1.1"
+brew "openssl@3", link: false
+brew "pandoc"
+brew "readline"
+brew "sqlite"
+brew "python@3.11", link: false
