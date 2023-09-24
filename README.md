@@ -1,6 +1,6 @@
 # Covid-Sewage-Search
 
-This repository contains the codes used in the paper "A COVID-19 Early Alert System via Massively Testing the Sewage Network". The authors of this paper are I. S. Beaudry, J. Baboun, L. M. Castro, A. Jara, B. Rubio, and J. Verschae.
+This repository contains the codes used in the paper "Mathematical Methods for Searching on Trees Under Network Uncertainty: A Case Study forVirus Detection on Sewage Networks". The authors of this paper are I. S. Beaudry, J. Baboun, L. M. Castro, A. Jara, B. Rubio, and J. Verschae.
 
 ## Files description
 
